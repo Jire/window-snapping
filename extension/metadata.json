@@ -1,0 +1,19 @@
+{
+  "uuid": "window-snapping@jire.github.io",
+  "name": "Window Snapping",
+  "description": "Windows 11 window snapping for GNOME.\n\n• Drag a window to the left or right edge for half the screen, to any corner for a quarter, or to the top to maximize, with a frosted live preview\n• Drag it to the top centre for snap layouts: halves, thirds, quarters and more (Super+Z opens them from the keyboard)\n• Snap Assist fills the space that's left with your other windows\n• Super+Arrow keys work exactly like Win+Arrow: halves, quarters, maximize, restore, minimize, next monitor\n• Snapped windows resize together, and get their original size back when dragged away\n\nReplaces GNOME's built-in edge tiling while it's on, and gives it back when it's off.",
+  "url": "https://github.com/Jire/window-snapping",
+  "shell-version": [
+    "46",
+    "47",
+    "48",
+    "49",
+    "50",
+    "51"
+  ],
+  "session-modes": [
+    "user",
+    "unlock-dialog"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.window-snapping"
+}

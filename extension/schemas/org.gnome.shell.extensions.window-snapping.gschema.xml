@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!-- SPDX-FileCopyrightText: 2026 Jire -->
+<schemalist gettext-domain="window-snapping">
+  <enum id="org.gnome.shell.extensions.window-snapping.animations">
+    <value nick="system" value="0"/>
+    <value nick="always" value="1"/>
+    <value nick="never" value="2"/>
+  </enum>
+
+  <schema id="org.gnome.shell.extensions.window-snapping" path="/org/gnome/shell/extensions/window-snapping/">
+    <!-- Dragging -->
+    <key name="snap-on-drag" type="b">
+      <default>true</default>
+      <summary>Snap windows by dragging them to a screen edge or corner</summary>
+    </key>
+    <key name="snap-before-edge" type="b">
+      <default>true</default>
+      <summary>Snap without dragging all the way to the screen edge</summary>
+      <description>Start snapping a little before the pointer reaches the edge. Also makes snapping work on an edge shared with another monitor.</description>
+    </key>
+    <key name="snap-layouts-on-drag" type="b">
+      <default>true</default>
+      <summary>Show snap layouts when a window is dragged to the top of the screen</summary>
+    </key>
+
+    <!-- After snapping -->
+    <key name="snap-assist" type="b">
+      <default>true</default>
+      <summary>When a window is snapped, suggest what to snap next to it</summary>
+    </key>
+    <key name="snap-fill" type="b">
+      <default>true</default>
+      <summary>Size a snapped window to fill the available space</summary>
+    </key>
+    <key name="joint-resize" type="b">
+      <default>true</default>
+      <summary>Resize adjacent snapped windows together</summary>
+    </key>
+
+    <!-- Keyboard -->
+    <key name="keyboard-snapping" type="b">
+      <default>true</default>
+      <summary>Use Windows-style Super+Arrow snapping</summary>
+      <description>Super+Left/Right snap to halves and move between monitors, Super+Up/Down make quarters, maximize, restore and minimize, exactly like Windows.</description>
+    </key>
+    <key name="show-snap-layouts" type="as">
+      <default><![CDATA[['<Super>z']]]></default>
+      <summary>Shortcut that opens the snap layouts for the focused window</summary>
+    </key>
+    <key name="snap-top-half" type="as">
+      <default><![CDATA[['<Super><Alt>Up']]]></default>
+      <summary>Shortcut that snaps the focused window to the top half</summary>
+    </key>
+    <key name="snap-bottom-half" type="as">
+      <default><![CDATA[['<Super><Alt>Down']]]></default>
+      <summary>Shortcut that snaps the focused window to the bottom half</summary>
+    </key>
+
+    <!-- Look -->
+    <key name="window-gap" type="i">
+      <range min="0" max="48"/>
+      <default>0</default>
+      <summary>Space between snapped windows, in pixels</summary>
+    </key>
+    <key name="animations" enum="org.gnome.shell.extensions.window-snapping.animations">
+      <default>'system'</default>
+      <summary>Snapping animations</summary>
+    </key>
+
+    <!-- Internal -->
+    <key name="saved-edge-tiling" type="s">
+      <default>''</default>
+      <summary>GNOME's edge tiling setting from before the extension was enabled ('' when nothing is saved)</summary>
+    </key>
+
+    <key name="saved-shell-keybindings" type="s">
+      <default>'{}'</default>
+      <summary>GNOME Shell keybindings set aside while the extension runs (JSON, restored when it's disabled)</summary>
+    </key>
+
+    <!-- Troubleshooting -->
+    <key name="debug" type="b">
+      <default>false</default>
+      <summary>Debug logging</summary>
+    </key>
+  </schema>
+</schemalist>
