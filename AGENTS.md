@@ -24,7 +24,8 @@ If something doesn't snap, have them turn on **Debug logging** in the settings a
 | `extension/extension.js` | Entry point: wires the parts together, turns GNOME's edge tiling off while enabled (backed up in our settings so a crash can't lose it) |
 | `extension/snapper.js` | The snapping engine: zones, snapped-window records, restore geometry, the tiled look, snap fill, reflow on work area changes |
 | `extension/dragSnap.js` | Title-bar drags: grab handling, pointer tracking, edge/corner hit-testing (incl. edges shared between monitors), restoring on drag, Esc |
-| `extension/preview.js` | The frosted snap preview, and `FrostedPanel` (background blur + tint) used by every overlay |
+| `extension/acrylic.js` | `Acrylic`, the frosted glass behind every overlay (see "Glass" below) |
+| `extension/preview.js` | The snap preview shown while dragging, and `insetRect()` for its gaps |
 | `extension/snapBar.js` | The snap layouts bar that drops down near the top while dragging |
 | `extension/layoutPicker.js` | Layout thumbnails, shared by the snap bar and the Super+Z flyout |
 | `extension/flyout.js` | Super+Z flyout with Windows' number-key selection |
@@ -34,6 +35,7 @@ If something doesn't snap, have them turn on **Debug logging** in the settings a
 | `extension/animation.js` | Window morph animation (snapshot + guarded freeze/thaw) and the animation policy |
 | `extension/geometry.js` | Pure geometry: zones, hit-testing, layouts, Snap Assist free space. No Shell imports; unit-tested |
 | `extension/compat.js` | Every API that differs between GNOME 46 and 51, in one place |
+| `extension/gtype.js` | `typeName()`: GObject type names unique to each loaded copy, so reloading without logging out works |
 | `extension/prefs.js` | Preferences window (libadwaita) |
 | `extension/stylesheet.css` | Styles; accent colours are applied from JavaScript |
 | `extension/schemas/` | GSettings schema XML only. GNOME 44+ and `install.sh` compile it at install time; don't commit or ship `gschemas.compiled` |
@@ -47,8 +49,10 @@ If something doesn't snap, have them turn on **Debug logging** in the settings a
 
 - **Dragging.** On `grab-op-begin` for a mouse move, a snapped or maximized window is restored right away to its pre-snap size, placed so the pointer keeps the same relative spot on it. Mutter positions dragged windows by a relative anchor (since 46), so it stays under the pointer for the rest of the drag. The pointer is followed with the cursor tracker's `position-invalidated` (`track_position()` is needed on 46–48). Esc is detected at `grab-op-end` by the primary button still being held.
 - **Snapping.** Maximize flags are changed first and `move_resize_frame()` comes last (the last request wins; Mutter recomputes the other direction otherwise). With no gap, full-height zones are vertically maximized and full-width ones horizontally, because that's the only way Mutter tells apps a window is tiled (square corners). GNOME's own size-change animation is skipped (`skipNextEffect`, then any unused skip is cleared) and `animation.js` animates instead.
+- **Snap bar.** It only shows once the pointer has rested near the top for `REST_MS` (moving more than `REST_SLOP` restarts the wait, and a timer rechecks a pointer that doesn't move), so the whole top edge, centre included, maximizes until then.
 - **Restore geometry.** Each snapped window remembers the floating geometry from before its first snap. Drag-initiated snaps remember the geometry from before the drag. A snapped window maximized by other means (double-click, button) is restored to that geometry, like Windows.
 - **Keys.** `Meta.keybindings_set_custom_handler()` on `toggle-tiled-left/right`, `maximize` and `unmaximize`, so users keep their own key choices. GNOME 46–47 call handlers as `(display, window, binding)`, later versions add the event before the binding. Super+Alt+Up/Down collide with GNOME Shell's `shift-overview-up/down`; those are set aside in `org.gnome.shell.keybindings` while the extension runs (backed up in `saved-shell-keybindings`), because Mutter picks one of two bindings for the same key at random.
+- **Glass.** Never use `Shell.BlurEffect` in `BACKGROUND` mode: it blurs a copy of the framebuffer, and GNOME only repaints damaged regions, so the copy is partly stale and shows hard-edged bars. `Acrylic` instead clones the actors painted before it (or the sources it's given; containers without a size of their own, like the window groups, child by child, because on 46–50 a clone of a size-less actor paints nothing), blurs them in `ACTOR` mode in its own buffer, then one shader pass (`Shell.GLSLEffect` on 46–50, `Clutter.ShaderEffect` snippets on 51) cuts the antialiased rounded corners, draws the drop shadow outside the glass only (CSS `-wsnap-shadow`; a `box-shadow` would darken translucent glass unevenly) and dithers. The shader maps texture coordinates with Clutter's offscreen padding (`_clutter_actor_box_enlarge_for_effects()`, same on 46–51); Cogl rejects the blend string `Shell.GLSLEffect` sets, so every version blends premultiplied. Each clone's paint volume is its source's grown by the blur's reach, so a change behind the glass repaints everything the blur spreads it to. Clones are placed directly when their sources are allocated and the scene is shifted by a translation, so nothing queues a relayout mid-layout (Clutter warns "needs an allocation" otherwise).
 - **Snap Assist** is modal (`pushModal`, `POPUP` action mode) and forwards Super+Arrow keys to the keyboard controller. Free space is computed in `geometry.freeZonesAfter()`.
 - **State** lives in memory. `session-modes` includes `unlock-dialog` so locking the screen doesn't throw away which windows are snapped; all UI closes when the session locks, and keybindings only act in normal mode.
 
@@ -57,6 +61,7 @@ If something doesn't snap, have them turn on **Debug logging** in the settings a
 - Every `connect` needs a matching `disconnect` (use `connectObject` / `disconnectObject`), and `disable()` must undo everything `enable()` did: actors, timers, keybindings, GNOME settings.
 - Mutter aborts the whole shell if a window actor is thawed more often than it was frozen. Only freeze through `animation.js`, which thaws exactly once and never touches a destroyed actor.
 - APIs that differ between versions go through `compat.js`. In GJS, `get_pivot_point()` returns `[x, y]`; use `compat.vbox()` for vertical `St.BoxLayout`s.
+- Register GObject classes with `GTypeName: typeName('Name')` from `gtype.js`: GJS refuses to register a type name twice in one session, which would break reloading.
 - Start new source files with the SPDX header used in the existing files. Logging during normal operation goes through `ext.log()`, which only logs when the `debug` setting is on.
 
 ## Checking changes

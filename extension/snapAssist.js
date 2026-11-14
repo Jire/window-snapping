@@ -23,9 +23,11 @@ import St from 'gi://St';
 import * as Background from 'resource:///org/gnome/shell/ui/background.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {Acrylic} from './acrylic.js';
 import {accentRgb, styleVariant, vbox} from './compat.js';
 import * as G from './geometry.js';
-import {FrostedPanel, insetRect} from './preview.js';
+import {typeName} from './gtype.js';
+import {insetRect} from './preview.js';
 import {isSnappable} from './snapper.js';
 
 const FADE_MS = 160;
@@ -43,6 +45,7 @@ function scale() {
 // -- Thumbnails ---------------------------------------------------------------
 
 const WindowCard = GObject.registerClass({
+    GTypeName: typeName('WindowCard'),
     Signals: {'chosen': {}, 'close-requested': {}},
 }, class WindowCard extends St.Button {
     _init(win, width, thumbHeight) {
@@ -171,8 +174,6 @@ class AssistPanel {
             return Clutter.EVENT_STOP;
         });
         this._overlay.connect('key-press-event', (a, event) => this._onKey(event));
-        // Fading this group must not render it offscreen (see FrostedPanel).
-        this._overlay.offscreen_redirect = Clutter.OffscreenRedirect.NEVER;
         Main.layoutManager.uiGroup.add_child(this._overlay);
 
         // Like Windows, the free space shows the desktop (frosted), not the
@@ -180,7 +181,12 @@ class AssistPanel {
         // the whole zone, gutters included, so nothing peeks through.
         this._addWallpaper(monitor, zoneRect);
 
-        this._panel = new FrostedPanel({styleClass: 'wsnap-assist', blur: true});
+        // Its glass frosts just the wallpaper, too.
+        this._panel = new Acrylic({
+            radius: 16,
+            styleClass: 'wsnap-assist',
+            sources: () => [this._wallpaperGroup],
+        });
         this._panel.set_position(rect.x, rect.y);
         this._panel.set_size(rect.width, rect.height);
         this._panel.reactive = true; // clicks between cards don't close it
@@ -246,6 +252,7 @@ class AssistPanel {
             layout_manager: new Clutter.BinLayout(),
         });
         this._wallpaper.add_child(group);
+        this._wallpaperGroup = group;
         this._overlay.add_child(this._wallpaper);
         this._bgManager = new Background.BackgroundManager({
             container: group,

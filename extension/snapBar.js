@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // SPDX-FileCopyrightText: 2026 Jire
 //
-// Windows 11's "snap bar": while a window is dragged near the top of a
-// screen, a strip peeks down from the top centre. Drag onto it and it opens
-// into the snap layouts; hover a zone to preview it full size, drop to snap.
-// The rest of the top edge still maximizes.
+// Windows 11's "snap bar": hold a dragged window still near the top of a
+// screen and a strip peeks down from the top centre. Drag onto it and it
+// opens into the snap layouts; hover a zone to preview it full size, drop to
+// snap. Until it shows, the whole top edge maximizes, so flicking a window
+// straight to the top centre still maximizes it.
 
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {Acrylic} from './acrylic.js';
+import {styleVariant} from './compat.js';
 import * as G from './geometry.js';
 import {LayoutPicker} from './layoutPicker.js';
-import {FrostedPanel} from './preview.js';
-import {styleVariant} from './compat.js';
 
 const PEEK = 10; // px of the collapsed bar showing below the top edge
 const OPEN_TOP = 10; // gap above the open bar
@@ -23,21 +25,62 @@ const SLIDE_MS = 220;
 // The open bar stays open while the pointer is this close to it.
 const KEEP_SIDE = 28;
 const KEEP_BELOW = 64;
+// The bar shows once the pointer has rested near the top this long. Moving
+// more than REST_SLOP (logical px) starts the wait over, so a window carried
+// to the top, however slowly, maximizes as usual.
+const REST_MS = 450;
+const REST_SLOP = 10;
 
 export class SnapBar {
     constructor(ext, controller) {
         this._ext = ext;
         this._controller = controller;
         this._monitor = -1;
+        this._monitorRect = null; // that monitor's geometry when the bar was built
         this._state = 'hidden'; // 'hint' | 'open'
+        this._x = 0; // left edge of the bar on the stage
+        this._clip = null;
         this._actor = null;
         this._panel = null;
         this._picker = null;
         this._size = [0, 0];
+        this._revealed = false; // shown during this visit to the top
+        this._rest = null; // {x, y, since}: where and when the pointer came to rest
+        this._restTimer = 0;
     }
 
     destroy() {
+        this._forgetRest();
         this._destroyActor();
+    }
+
+    _forgetRest() {
+        this._revealed = false;
+        this._rest = null;
+        if (this._restTimer) {
+            GLib.source_remove(this._restTimer);
+            this._restTimer = 0;
+        }
+    }
+
+    /** Has the pointer rested at (x, y) long enough? Checks again when it would have. */
+    _rested(x, y) {
+        const now = GLib.get_monotonic_time() / 1000;
+        const slop = REST_SLOP * this._scale();
+        const r = this._rest;
+        if (!r || Math.abs(x - r.x) > slop || Math.abs(y - r.y) > slop) {
+            this._rest = {x, y, since: now};
+            if (this._restTimer)
+                GLib.source_remove(this._restTimer);
+            // The pointer may not move again: look again once the wait is over.
+            this._restTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, REST_MS, () => {
+                this._restTimer = 0;
+                this._controller.refresh();
+                return GLib.SOURCE_REMOVE;
+            });
+            return false;
+        }
+        return now - r.since >= REST_MS;
     }
 
     updateColors() {
@@ -56,12 +99,25 @@ export class SnapBar {
         const layouts = G.layoutsFor(wa);
         const s = this._scale();
 
+        // The bar slides out from behind the top edge of its screen. Clip it
+        // to that screen, so none of it shows on a screen above this one.
+        const mon = Main.layoutManager.monitors[monitor];
+        this._monitorRect = G.rect(mon.x, mon.y, mon.width, mon.height);
+        this._clip = new St.Widget({
+            reactive: false,
+            clip_to_allocation: true,
+            x: mon.x,
+            y: mon.y,
+            width: mon.width,
+            height: mon.height,
+        });
         this._actor = new St.Widget({reactive: false, visible: false});
-        this._panel = new FrostedPanel({styleClass: 'wsnap-bar', blur: true});
+        this._panel = new Acrylic({radius: 16, styleClass: 'wsnap-bar'});
         this._picker = new LayoutPicker({layouts, aspect: wa.width / wa.height, reactive: false});
         this._actor.add_child(this._panel);
         this._actor.add_child(this._picker);
-        Main.layoutManager.uiGroup.add_child(this._actor);
+        this._clip.add_child(this._actor);
+        Main.layoutManager.uiGroup.add_child(this._clip);
 
         const [, natW] = this._picker.get_preferred_width(-1);
         const [, natH] = this._picker.get_preferred_height(natW);
@@ -73,8 +129,8 @@ export class SnapBar {
         this._picker.set_size(natW, natH);
         this._applyStyle();
 
-        const mon = Main.layoutManager.monitors[monitor];
-        this._actor.set_position(Math.round(mon.x + (mon.width - w) / 2), mon.y);
+        this._x = mon.x + Math.round((mon.width - w) / 2);
+        this._actor.set_position(this._x - mon.x, 0);
         this._actor.translation_y = -h;
         this._state = 'hidden';
     }
@@ -91,7 +147,8 @@ export class SnapBar {
     }
 
     _destroyActor() {
-        this._actor?.destroy();
+        this._clip?.destroy();
+        this._clip = null;
         this._actor = null;
         this._panel = null;
         this._picker = null;
@@ -143,9 +200,8 @@ export class SnapBar {
     /** Bar geometry in stage coordinates for the open state. */
     _openRect() {
         const [w, h] = this._size;
-        const [x] = this._actor.get_position();
         const mon = Main.layoutManager.monitors[this._monitor];
-        return G.rect(x, mon.y + OPEN_TOP * this._scale(), w, h);
+        return G.rect(this._x, mon.y + OPEN_TOP * this._scale(), w, h);
     }
 
     /**
@@ -158,13 +214,14 @@ export class SnapBar {
         if (!mon)
             return null;
         const s = this._scale();
-        if (monitor !== this._monitor)
+        if (monitor !== this._monitor || !G.rectsEqual(this._monitorRect, mon)) {
+            this._forgetRest();
             this._build(monitor);
+        }
 
         const [w] = this._size;
         const hintZone = Math.min(Math.max(mon.height * 0.16, 120 * s), 220 * s);
-        const [bx] = this._actor.get_position();
-        const inSpan = x >= bx - KEEP_SIDE * s && x < bx + w + KEEP_SIDE * s;
+        const inSpan = x >= this._x - KEEP_SIDE * s && x < this._x + w + KEEP_SIDE * s;
 
         if (this._state === 'open') {
             const r = this._openRect();
@@ -187,8 +244,14 @@ export class SnapBar {
         }
 
         if (y - mon.y > hintZone) {
+            this._forgetRest();
             this._setState('hidden');
             return null;
+        }
+        if (!this._revealed) {
+            if (!this._rested(x, y))
+                return null;
+            this._revealed = true;
         }
         // Touching the top edge on the bar opens it.
         if (inSpan && y <= mon.y + Math.max(PEEK + 14, 24) * s) {
@@ -201,6 +264,7 @@ export class SnapBar {
 
     /** Hide at the end of a drag. */
     hide(animate = true) {
+        this._forgetRest();
         if (!this._actor)
             return;
         if (!animate) {

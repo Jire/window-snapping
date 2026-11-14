@@ -8,10 +8,10 @@
 
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
-import Shell from 'gi://Shell';
-import St from 'gi://St';
 
+import {Acrylic} from './acrylic.js';
 import {accentRgb} from './compat.js';
+import {typeName} from './gtype.js';
 
 const SHOW_MS = 220;
 const MORPH_MS = 200;
@@ -20,9 +20,6 @@ const HIDE_MS = 140;
 export const OUTER_INSET = 8;
 export const INNER_INSET = 4;
 const RADIUS = 12;
-// The blurred layer has square corners, so it sits this far inside the
-// rounded outline (radius × (1 − 1/√2), rounded up) and the rim covers it.
-const FROST_INSET = Math.ceil(RADIUS * (1 - Math.SQRT1_2)) + 1;
 
 /** Shrink a zone rect for display: more at the work area edges, less between zones. */
 export function insetRect(r, workArea, scale = 1) {
@@ -35,70 +32,45 @@ export function insetRect(r, workArea, scale = 1) {
     return {x: x1, y: y1, width: Math.max(1, x2 - x1), height: Math.max(1, y2 - y1)};
 }
 
-/** Frosted, tinted rounded rectangle. Used by the preview and by Snap Assist. */
-export const FrostedPanel = GObject.registerClass(
-class FrostedPanel extends St.Widget {
-    _init({styleClass = 'wsnap-glass', blur = true} = {}) {
-        super._init({reactive: false});
-        // Background blur reads what's already on screen; drawing this actor
-        // into an offscreen buffer (Clutter does that for fading groups)
-        // would leave it nothing to blur.
-        this.offscreen_redirect = Clutter.OffscreenRedirect.NEVER;
-        this._frost = null;
-        if (blur && Shell.BlurEffect) {
-            this._frost = new St.Widget();
-            const effect = new Shell.BlurEffect({mode: Shell.BlurMode.BACKGROUND});
-            // GNOME 46+ call it "radius"; it used to be "sigma".
-            if ('radius' in effect)
-                effect.radius = 36;
-            else
-                effect.sigma = 18;
-            effect.brightness = 0.92;
-            this._frost.add_effect_with_name('wsnap-blur', effect);
-            this.add_child(this._frost);
-        }
-        this._glass = new St.Widget({style_class: styleClass});
-        this.add_child(this._glass);
-    }
-
-    vfunc_allocate(box) {
-        this.set_allocation(box);
-        const w = box.get_width(), h = box.get_height();
-        const full = new Clutter.ActorBox();
-        full.set_origin(0, 0);
-        full.set_size(w, h);
-        this._glass.allocate(full);
-        if (this._frost) {
-            const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-            const inset = FROST_INSET * scale;
-            const frostBox = new Clutter.ActorBox();
-            frostBox.set_origin(inset, inset);
-            frostBox.set_size(Math.max(0, w - 2 * inset), Math.max(0, h - 2 * inset));
-            this._frost.allocate(frostBox);
-        }
-    }
-
-    setTint(style) {
-        this._glass.set_style(style);
-    }
-});
-
-export const SnapPreview = GObject.registerClass(
-class SnapPreview extends FrostedPanel {
+export const SnapPreview = GObject.registerClass({GTypeName: typeName('SnapPreview')},
+class SnapPreview extends Acrylic {
     _init(ext) {
-        super._init({styleClass: 'wsnap-preview', blur: true});
+        super._init({radius: RADIUS, styleClass: 'wsnap-preview'});
         this._ext = ext;
         this._rect = null;
         this._showing = false;
+        this._window = null;
         this.visible = false;
         global.window_group.add_child(this);
         this.updateColors();
+        // Mutter restacks windows by lowering each one to the bottom, which
+        // leaves this above all of them: put it back under the dragged window.
+        global.display.connectObject('restacked', () => {
+            if (this.visible)
+                this._restack();
+        }, this);
     }
 
     updateColors() {
         const [r, g, b] = accentRgb();
         this.setTint(`background-color: rgba(${r}, ${g}, ${b}, 0.24); ` +
             `border-color: rgba(${r}, ${g}, ${b}, 0.85);`);
+    }
+
+    /** Stack just below the dragged window, so the glass shows what's behind both. */
+    _restack() {
+        if (!this._window)
+            return;
+        const group = global.window_group;
+        const actor = this._window.get_compositor_private();
+        const below = actor?.get_parent() === group ? actor : null;
+        if (below ? this.get_next_sibling() === below : group.get_last_child() === this)
+            return;
+        if (below)
+            group.set_child_below_sibling(this, below);
+        else
+            group.set_child_above_sibling(this, null);
+        this.refresh();
     }
 
     get showing() {
@@ -110,11 +82,8 @@ class SnapPreview extends FrostedPanel {
      * below `window`. `origin` = [x, y] the preview grows out of.
      */
     open(window, rect, origin) {
-        const actor = window?.get_compositor_private();
-        if (actor && actor.get_parent() === global.window_group)
-            global.window_group.set_child_below_sibling(this, actor);
-        else
-            global.window_group.set_child_above_sibling(this, null);
+        this._window = window;
+        this._restack();
 
         if (this._rect && this._showing &&
             this._rect.x === rect.x && this._rect.y === rect.y &&
@@ -161,10 +130,7 @@ class SnapPreview extends FrostedPanel {
             opacity: 0,
             duration: HIDE_MS,
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
-            onStopped: () => {
-                if (!this._showing)
-                    this.hide();
-            },
+            onStopped: () => this._hidden(),
         };
         if (toward) {
             const [w, h] = this.get_size();
@@ -189,10 +155,14 @@ class SnapPreview extends FrostedPanel {
             opacity: 0,
             duration: HIDE_MS,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onStopped: () => {
-                if (!this._showing)
-                    this.hide();
-            },
+            onStopped: () => this._hidden(),
         });
+    }
+
+    _hidden() {
+        if (this._showing)
+            return;
+        this.hide();
+        this._window = null;
     }
 });

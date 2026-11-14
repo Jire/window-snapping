@@ -19,8 +19,9 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import * as Compat from './compat.js';
+import {Acrylic} from './acrylic.js';
 import * as G from './geometry.js';
-import {FrostedPanel, insetRect} from './preview.js';
+import {insetRect} from './preview.js';
 import {monitorAt} from './dragSnap.js';
 
 const DIR_W = 0x1000, DIR_E = 0x2000, DIR_S = 0x4000, DIR_N = 0x8000;
@@ -46,8 +47,7 @@ class Veil {
         this.win = win;
         const actor = win.get_compositor_private();
         this.actor = new St.Widget({layout_manager: new Clutter.BinLayout(), reactive: false});
-        this.actor.offscreen_redirect = Clutter.OffscreenRedirect.NEVER;
-        this._glass = new FrostedPanel({styleClass: 'wsnap-veil', blur: true});
+        this._glass = new Acrylic({radius: 0, styleClass: 'wsnap-veil'});
         this._glass.x_expand = this._glass.y_expand = true;
         this.actor.add_child(this._glass);
         const light = Compat.styleVariant(Main) === 'light';

@@ -6,15 +6,18 @@
  * colour on every GNOME version); everything else lives here. The light
  * variants use the .wsnap-light class, which JavaScript sets on the top-level
  * actors when GNOME Shell uses its light style.
+ *
+ * The frosted glass (acrylic.js) draws its own drop shadow, around the glass
+ * only, from -wsnap-shadow (box-shadow syntax). A box-shadow here would also
+ * fall under the translucent glass and darken it unevenly.
  */
 
 /* ---- Snap preview (while dragging) ------------------------------------ */
 
 .wsnap-preview {
-    border-radius: 12px;
     border-width: 1px;
     border-style: solid;
-    box-shadow: 0 6px 22px 0 rgba(0, 0, 0, 0.28);
+    -wsnap-shadow: 0 6px 22px 0 rgba(0, 0, 0, 0.28);
 }
 
 /* ---- Frosted panels: snap bar, layouts flyout, Snap Assist ------------- */
@@ -22,16 +25,15 @@
 .wsnap-bar,
 .wsnap-flyout-panel,
 .wsnap-assist {
-    border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.11);
-    box-shadow: 0 10px 32px 0 rgba(0, 0, 0, 0.38);
+    -wsnap-shadow: 0 10px 32px 0 rgba(0, 0, 0, 0.38);
 }
 
 .wsnap-light .wsnap-bar,
 .wsnap-light .wsnap-flyout-panel,
 .wsnap-light .wsnap-assist {
     border-color: rgba(0, 0, 0, 0.09);
-    box-shadow: 0 10px 32px 0 rgba(0, 0, 0, 0.16);
+    -wsnap-shadow: 0 10px 32px 0 rgba(0, 0, 0, 0.16);
 }
 
 /* ---- Snap layout thumbnails -------------------------------------------- */
@@ -87,11 +89,12 @@
     padding: 14px;
 }
 
+/* The hint under the layouts. */
 .wsnap-flyout-title {
     color: rgba(255, 255, 255, 0.72);
     font-size: 9.5pt;
     font-weight: 600;
-    padding: 0 2px 10px 2px;
+    padding: 10px 2px 0 2px;
 }
 
 .wsnap-light .wsnap-flyout-title {
@@ -167,6 +170,7 @@
 
 /* ---- Joint resize veil (frosted placeholder with the app icon) --------- */
 
+/* Square, no border, no shadow: it stands in for the window underneath. */
 .wsnap-veil {
-    border-radius: 0;
+    border-width: 0;
 }

@@ -12,10 +12,10 @@ import Shell from 'gi://Shell';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {Acrylic} from './acrylic.js';
 import {styleVariant, vbox} from './compat.js';
 import * as G from './geometry.js';
 import {LayoutPicker} from './layoutPicker.js';
-import {FrostedPanel} from './preview.js';
 import {isSnappable} from './snapper.js';
 
 const OPEN_MS = 160;
@@ -75,10 +75,9 @@ export class LayoutFlyout {
             width: global.stage.width,
             height: global.stage.height,
         });
-        overlay.offscreen_redirect = Clutter.OffscreenRedirect.NEVER;
         Main.layoutManager.uiGroup.add_child(overlay);
 
-        const panel = new FrostedPanel({styleClass: 'wsnap-flyout-panel', blur: true});
+        const panel = new Acrylic({radius: 16, styleClass: 'wsnap-flyout-panel'});
         overlay.add_child(panel);
         const content = vbox({style_class: 'wsnap-flyout-content'});
         const picker = new LayoutPicker({

@@ -7,7 +7,7 @@ Windows 11 window snapping for GNOME: drag a window to any edge or corner, pick 
 </p>
 
 - **Every edge and every corner.** Drag a window to the left or right edge for half the screen, to any of the four corners for a quarter, or to the top to maximize. A frosted preview shows where it'll go and glides along as you move.
-- **Snap layouts.** Drag a window toward the top of the screen and the snap bar drops down with halves, two-thirds, thirds, quarters and more. Drop the window on a zone. Super + Z opens the same layouts from the keyboard.
+- **Snap layouts.** Drag a window to the top of the screen and hold it there a moment: the snap bar drops down with halves, two-thirds, thirds, quarters and more. Drop the window on a zone. (Let go right away and it maximizes, as usual.) Super + Z opens the same layouts from the keyboard.
 - **Snap Assist.** After you snap a window, the space that's left fills with your other windows. Pick one and it snaps in, until the screen is full.
 - **Super + arrow keys that behave like Windows.** Halves, quarters, maximize, restore, minimize and moving to the next monitor, step by step, the way Win + arrow keys do it.
 - **Snapped windows stay tidy.** Drag the line between snapped windows to resize them together. Drag a snapped window away and it gets its original size back.
@@ -66,8 +66,8 @@ This also works for reloading after an update. At your next normal login the reg
 | --- | --- |
 | The left or right edge | That half of the screen |
 | A corner | That quarter of the screen |
-| The top edge | Maximized |
-| The top centre, onto the snap bar that drops down | Hover a zone of any layout, drop the window there |
+| The top edge, including the centre | Maximized |
+| The top centre, then hold still for a moment | The snap bar drops down: hover a zone of any layout, drop the window there |
 | Away from where it's snapped or maximized | Its original size back, right under the pointer |
 | Anywhere, then press <kbd>Esc</kbd> | Cancelled: it goes back where it was |
 
@@ -142,6 +142,7 @@ curl -fsSL https://raw.githubusercontent.com/Jire/window-snapping/main/install.s
 - **Restoring:** each snapped window remembers the size and position it had before it was snapped. Dragging it away, Super + ↓, or restoring it after maximizing it brings that back.
 - **Keys:** Super + arrow keys stay bound to GNOME's own "View split on left/right", "Maximize" and "Restore" actions (you can still change them in GNOME Settings); only what they do changes. Super + Alt + ↑ / ↓ are set aside from GNOME's overview while the extension runs, and put back when it's turned off.
 - **Snap Assist** shows live thumbnails of the windows on the current workspace, most recently used first, over a frosted view of your wallpaper. Windows already snapped on that screen aren't offered again.
+- **The frosted glass** of the preview, the snap bar and Snap Assist is made from live copies of what's behind it, blurred in a buffer of its own. (GNOME's built-in background blur works from the screen as it was last drawn, which can leave stale, banded patches in the glass.)
 
 ## Troubleshooting
 

@@ -117,6 +117,11 @@ export class DragController {
         this.preview.destroy();
     }
 
+    /** Look at the pointer again, though it hasn't moved. */
+    refresh() {
+        this._update();
+    }
+
     isDragging(win) {
         return this._session?.win === win;
     }

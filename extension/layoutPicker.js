@@ -11,6 +11,7 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import {accentRgb} from './compat.js';
+import {typeName} from './gtype.js';
 
 // Space between zones inside a thumbnail, and their corner radius (px at
 // scale 1); thumbnails are drawn with the work area's aspect ratio.
@@ -18,6 +19,7 @@ const CELL_GAP = 3;
 const THUMB_HEIGHT = 58;
 
 const ZoneCell = GObject.registerClass({
+    GTypeName: typeName('ZoneCell'),
     Signals: {
         'activated': {},
         'hovered': {param_types: [GObject.TYPE_BOOLEAN]},
@@ -64,6 +66,7 @@ const ZoneCell = GObject.registerClass({
 });
 
 const LayoutThumb = GObject.registerClass({
+    GTypeName: typeName('LayoutThumb'),
 }, class LayoutThumb extends St.Widget {
     _init(layout, index, width, height, reactive) {
         super._init({
@@ -122,6 +125,7 @@ const LayoutThumb = GObject.registerClass({
 });
 
 export const LayoutPicker = GObject.registerClass({
+    GTypeName: typeName('LayoutPicker'),
     Signals: {
         'zone-activated': {param_types: [GObject.TYPE_INT, GObject.TYPE_INT]},
         'zone-hovered': {param_types: [GObject.TYPE_INT, GObject.TYPE_INT]},
